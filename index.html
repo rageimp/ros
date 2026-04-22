@@ -521,6 +521,13 @@ for (const npc of NPCS) {
 function bestNpcBuy(itemName)  { const e = (npcBuyIndex[itemName.toLowerCase()]||[]).sort((a,b)=>b.price-a.price)[0]; return e||null; }
 function bestNpcSell(itemName) { const e = (npcSellIndex[itemName.toLowerCase()]||[]).sort((a,b)=>a.price-b.price)[0]; return e||null; }
 
+// canonical display names for NPC-only items (not in itemIndex)
+const npcItemNames = {};
+for (const npc of NPCS) {
+  for (const it of (npc.you_sell||[])) { const k=(it.name||'').toLowerCase().trim(); if(!npcItemNames[k]) npcItemNames[k]=it.name; }
+  for (const it of (npc.you_buy||[]))  { const k=(it.name||'').toLowerCase().trim(); if(!npcItemNames[k]) npcItemNames[k]=it.name; }
+}
+
 // ── monster drop value (gold) ────────────────────────────────────────────────
 function itemGoldValue(itemName) {
   const n = (itemName||'').toLowerCase().trim();
@@ -567,13 +574,14 @@ function renderItemMode() {
 
 function renderItemList() {
   const q = searchQ.toLowerCase();
-  const allKeys = Object.keys(itemIndex).sort();
+  const allKeysSet = new Set([...Object.keys(itemIndex), ...Object.keys(npcBuyIndex), ...Object.keys(npcSellIndex)]);
+  const allKeys = [...allKeysSet].sort();
   const filtered = q ? allKeys.filter(k => k.includes(q)) : allKeys;
   document.getElementById('countBadge').textContent = `${filtered.length} items`;
   document.getElementById('listInfo').textContent = `${filtered.length} of ${allKeys.length} items`;
   const nav = document.getElementById('monsterList');
   nav.innerHTML = filtered.map(k => {
-    const name = itemIndex[k][0].drop.item;
+    const name = itemIndex[k] ? itemIndex[k][0].drop.item : (npcItemNames[k] || k);
     return `<a data-key="${k}" class="${k===activeItemKey?'active':''}" onclick="showItem('${k.replace(/'/g, '')}')">${name}</a>`;
   }).join('');
 }
@@ -585,11 +593,11 @@ function showItem(key, noHistory) {
     a.classList.toggle('active', a.dataset.key === key));
   if (changed && !noHistory) pushNav();
   const entries = itemIndex[key] || [];
-  if (!entries.length) return;
-  const displayName = entries[0].drop.item;
+  const displayName = entries.length ? entries[0].drop.item : (npcItemNames[key] || key);
   const buyEntries  = (npcBuyIndex[key]  || []).slice().sort((a,b) => b.price - a.price);
   const sellEntries = (npcSellIndex[key] || []).slice().sort((a,b) => a.price - b.price);
-  let html = `<div class="m-header"><div><div class="m-name">${displayName}</div><div class="m-sub">${entries.length} monster${entries.length===1?'':'s'} drop this</div></div></div>`;
+  const dropsSub = entries.length ? `${entries.length} monster${entries.length===1?'':'s'} drop this` : 'Not dropped by any monster';
+  let html = `<div class="m-header"><div><div class="m-name">${displayName}</div><div class="m-sub">${dropsSub}</div></div></div>`;
   if (buyEntries.length || sellEntries.length) {
     html += `<div class="section"><div class="section-title">NPC Prices</div><div class="npc-tables">`;
     if (buyEntries.length) {
@@ -612,26 +620,28 @@ function showItem(key, noHistory) {
     }
     html += '</div></div>';
   }
-  const drops = [...entries].sort((a,b) => chanceF(b.drop) - chanceF(a.drop));
-  html += `<div class="section"><div class="section-title">Dropped by (${drops.length} monster${drops.length===1?'':'s'})</div>
-  <table><thead><tr><th>Monster</th><th>Chance</th><th>Rarity</th><th>Amount</th><th>HP</th><th>EXP</th></tr></thead><tbody>`;
-  html += drops.map(e => `
-    <tr onclick="viewMonsterFromItem('${e.monster.slug}')" style="cursor:pointer">
-      <td style="color:var(--accent)">${e.monster.name}</td>
-      <td style="color:var(--yellow)">${e.drop.chance||'?'}</td>
-      <td>${rarityPill(e.drop.rarity)}</td>
-      <td style="color:var(--muted)">${e.drop.amount||'?'}</td>
-      <td style="color:var(--muted)">${hpInt(e.monster).toLocaleString()}</td>
-      <td style="color:var(--muted)">${expInt(e.monster).toLocaleString()}</td>
-    </tr>`).join('');
-  html += '</tbody></table></div>';
+  if (entries.length) {
+    const drops = [...entries].sort((a,b) => chanceF(b.drop) - chanceF(a.drop));
+    html += `<div class="section"><div class="section-title">Dropped by (${drops.length} monster${drops.length===1?'':'s'})</div>
+    <table><thead><tr><th>Monster</th><th>Chance</th><th>Rarity</th><th>Amount</th><th>HP</th><th>EXP</th></tr></thead><tbody>`;
+    html += drops.map(e => `
+      <tr onclick="viewMonsterFromItem('${e.monster.slug}')" style="cursor:pointer">
+        <td style="color:var(--accent)">${e.monster.name}</td>
+        <td style="color:var(--yellow)">${e.drop.chance||'?'}</td>
+        <td>${rarityPill(e.drop.rarity)}</td>
+        <td style="color:var(--muted)">${e.drop.amount||'?'}</td>
+        <td style="color:var(--muted)">${hpInt(e.monster).toLocaleString()}</td>
+        <td style="color:var(--muted)">${expInt(e.monster).toLocaleString()}</td>
+      </tr>`).join('');
+    html += '</tbody></table></div>';
+  }
   document.getElementById('detail').innerHTML = html;
 }
 
 function goToItem(e, itemName) {
   e.stopPropagation();
   const key = itemName.toLowerCase().trim();
-  if (!itemIndex[key]) return;
+  if (!itemIndex[key] && !npcBuyIndex[key] && !npcSellIndex[key]) return;
   pushNav();
   _suppressPush = true;
   mode = 'items';
@@ -753,13 +763,9 @@ function renderNpcDetail(npc) {
     return `<table>
       <thead><tr><th>Item</th><th>ID</th><th>Price</th></tr></thead>
       <tbody>
-        ${items.sort((a,b)=>a.name.localeCompare(b.name)).map(it => {
-          const hasDrops = !!itemIndex[(it.name||'').toLowerCase().trim()];
-          const nameCell = hasDrops
-            ? `<span class="item-link" data-item="${it.name}" onclick="goToItem(event,this.dataset.item)">${it.name}</span>`
-            : it.name;
-          return `<tr><td>${nameCell}</td><td style="color:var(--muted)">${it.id||'?'}</td><td class="price-tag">${(it.price||0).toLocaleString()} gp</td></tr>`;
-        }).join('')}
+        ${items.sort((a,b)=>a.name.localeCompare(b.name)).map(it =>
+          `<tr><td><span class="item-link" data-item="${it.name}" onclick="goToItem(event,this.dataset.item)">${it.name}</span></td><td style="color:var(--muted)">${it.id||'?'}</td><td class="price-tag">${(it.price||0).toLocaleString()} gp</td></tr>`
+        ).join('')}
       </tbody>
     </table>`;
   };
@@ -770,19 +776,14 @@ function renderNpcDetail(npc) {
       <table>
         <thead><tr><th>Item</th><th>You Buy</th><th>You Sell</th><th>Profit/ea</th></tr></thead>
         <tbody>
-          ${arb.sort((a,b)=>b.profit_per-a.profit_per).map(a => {
-            const arbKey = (a.name||'').toLowerCase().trim();
-            const hasDrops = !!itemIndex[arbKey];
-            const arbName = hasDrops
-              ? `<span class="item-link" data-item="${a.name}" onclick="goToItem(event,this.dataset.item)">${a.name}</span>`
-              : a.name;
-            return `<tr>
-              <td>${arbName}</td>
+          ${arb.sort((a,b)=>b.profit_per-a.profit_per).map(a =>
+            `<tr>
+              <td><span class="item-link" data-item="${a.name}" onclick="goToItem(event,this.dataset.item)">${a.name}</span></td>
               <td style="color:var(--yellow)">${a.buy_price.toLocaleString()} gp</td>
               <td style="color:var(--green)">${a.sell_price.toLocaleString()} gp</td>
               <td style="color:var(--green);font-weight:900">+${a.profit_per.toLocaleString()} gp</td>
-            </tr>`;
-          }).join('')}
+            </tr>`
+          ).join('')}
         </tbody>
       </table>
     </div>` : '';
