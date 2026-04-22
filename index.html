@@ -753,9 +753,13 @@ function renderNpcDetail(npc) {
     return `<table>
       <thead><tr><th>Item</th><th>ID</th><th>Price</th></tr></thead>
       <tbody>
-        ${items.sort((a,b)=>a.name.localeCompare(b.name)).map(it =>
-          `<tr><td>${it.name}</td><td style="color:var(--muted)">${it.id||'?'}</td><td class="price-tag">${(it.price||0).toLocaleString()} gp</td></tr>`
-        ).join('')}
+        ${items.sort((a,b)=>a.name.localeCompare(b.name)).map(it => {
+          const hasDrops = !!itemIndex[(it.name||'').toLowerCase().trim()];
+          const nameCell = hasDrops
+            ? `<span class="item-link" data-item="${it.name}" onclick="goToItem(event,this.dataset.item)">${it.name}</span>`
+            : it.name;
+          return `<tr><td>${nameCell}</td><td style="color:var(--muted)">${it.id||'?'}</td><td class="price-tag">${(it.price||0).toLocaleString()} gp</td></tr>`;
+        }).join('')}
       </tbody>
     </table>`;
   };
@@ -766,14 +770,19 @@ function renderNpcDetail(npc) {
       <table>
         <thead><tr><th>Item</th><th>You Buy</th><th>You Sell</th><th>Profit/ea</th></tr></thead>
         <tbody>
-          ${arb.sort((a,b)=>b.profit_per-a.profit_per).map(a =>
-            `<tr>
-              <td>${a.name}</td>
+          ${arb.sort((a,b)=>b.profit_per-a.profit_per).map(a => {
+            const arbKey = (a.name||'').toLowerCase().trim();
+            const hasDrops = !!itemIndex[arbKey];
+            const arbName = hasDrops
+              ? `<span class="item-link" data-item="${a.name}" onclick="goToItem(event,this.dataset.item)">${a.name}</span>`
+              : a.name;
+            return `<tr>
+              <td>${arbName}</td>
               <td style="color:var(--yellow)">${a.buy_price.toLocaleString()} gp</td>
               <td style="color:var(--green)">${a.sell_price.toLocaleString()} gp</td>
               <td style="color:var(--green);font-weight:900">+${a.profit_per.toLocaleString()} gp</td>
-            </tr>`
-          ).join('')}
+            </tr>`;
+          }).join('')}
         </tbody>
       </table>
     </div>` : '';
