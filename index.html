@@ -95,7 +95,7 @@ tbody tr.active-row{background:rgba(124,92,255,.12)!important}
 
 /* npc mode */
 .npc-wrap{display:grid;grid-template-columns:260px 1fr;height:100%;overflow:hidden}
-.npc-list-panel{border-right:1px solid var(--border);overflow-y:auto;padding:8px;background:var(--bg1)}
+.npc-list-panel{border-right:1px solid var(--border);overflow-y:auto;padding:6px;background:var(--bg1)}
 .npc-list-panel .npc-item{padding:10px 12px;border-radius:10px;border:1px solid transparent;cursor:pointer;font-size:14px;margin-bottom:4px}
 .npc-list-panel .npc-item:hover{background:rgba(255,255,255,.05);border-color:var(--border)}
 .npc-list-panel .npc-item.active{background:rgba(124,92,255,.18);border-color:rgba(124,92,255,.40);font-weight:800}
@@ -726,6 +726,9 @@ function renderNpcMode() {
     </div>`;
   }).join('');
 
+  document.getElementById('countBadge').textContent = `${filtered.length} NPCs`;
+  document.getElementById('listInfo').textContent = `${filtered.length} of ${NPCS.length} NPCs`;
+
   if (!listHtml) listHtml = '<div style="padding:14px;color:var(--muted);font-size:13px">No NPCs saved yet.<br>Use the in-game Save button to capture NPC trade data.</div>';
 
   let detailHtml = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted)">Select an NPC from the list</div>';
@@ -746,11 +749,14 @@ function renderNpcList() {
 
 function showNpc(idx) {
   activeNpcIdx = idx;
+  const listPanel = document.querySelector('.npc-list-panel');
+  const savedListScroll = listPanel ? listPanel.scrollTop : 0;
   renderNpcMode();
-  // scroll detail to top
   requestAnimationFrame(() => {
     const p = document.getElementById('npcDetail');
     if (p) p.scrollTop = 0;
+    const lp = document.querySelector('.npc-list-panel');
+    if (lp) lp.scrollTop = savedListScroll;
   });
 }
 
