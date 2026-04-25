@@ -255,6 +255,7 @@ function onSearch(v) {
 function renderMonsterMode() {
   document.getElementById('sidebar').style.display = '';
   document.getElementById('detail').style.gridColumn = '';
+  document.getElementById('detail').style.padding = '';
   const _sb = document.getElementById('sortBar');
   if (_sb) _sb.style.display = '';
   const _fp = document.getElementById('filterPanel');
@@ -564,6 +565,7 @@ let itemSortField = 'chance', itemSortAsc = false;
 function renderItemMode() {
   document.getElementById('sidebar').style.display = '';
   document.getElementById('detail').style.gridColumn = '';
+  document.getElementById('detail').style.padding = '';
   const _sb = document.getElementById('sortBar');
   if (_sb) _sb.style.display = 'none';
   const _fp = document.getElementById('filterPanel');
@@ -708,56 +710,51 @@ function viewMonsterFromItem(slug) {
 let activeNpcIdx = null;
 
 function renderNpcMode() {
-  document.getElementById('sidebar').style.display = 'none';
-  document.getElementById('detail').style.gridColumn = '1 / -1';
+  document.getElementById('sidebar').style.display = '';
+  document.getElementById('detail').style.gridColumn = '';
+  document.getElementById('detail').style.padding = '';
+  const _sb = document.getElementById('sortBar');
+  if (_sb) _sb.style.display = 'none';
+  const _fp = document.getElementById('filterPanel');
+  if (_fp) _fp.style.display = 'none';
+  renderNpcList();
+  if (activeNpcIdx !== null && NPCS[activeNpcIdx]) {
+    document.getElementById('detail').innerHTML = renderNpcDetail(NPCS[activeNpcIdx]);
+  } else {
+    document.getElementById('detail').innerHTML = '<div class="empty-msg"><div class="icon">🏪</div><div>Select an NPC from the list</div></div>';
+  }
+}
+
+function renderNpcList() {
   const q = searchQ.toLowerCase();
-  const filtered = NPCS.filter((n,i) => !q ||
+  const filtered = NPCS.filter(n => !q ||
     (n.npc||'').toLowerCase().includes(q) ||
     (n.location||'').toLowerCase().includes(q));
-
-  let listHtml = filtered.map((n, i) => {
-    const realIdx = NPCS.indexOf(n);
-    const buyCnt  = (n.you_buy||[]).length;
-    const sellCnt = (n.you_sell||[]).length;
-    return `<div class="npc-item${realIdx===activeNpcIdx?' active':''}" onclick="showNpc(${realIdx})">
-      <div>${n.npc||'Unknown'}</div>
-      <div class="npc-loc">${n.location&&n.location!=='(unknown)'?n.location+' · ':''}buy ${buyCnt} · sell ${sellCnt}</div>
-      ${n.description ? `<div class="npc-loc" style="color:var(--muted);font-style:italic">${n.description}</div>` : ''}
-    </div>`;
-  }).join('');
 
   document.getElementById('countBadge').textContent = `${filtered.length} NPCs`;
   document.getElementById('listInfo').textContent = `${filtered.length} of ${NPCS.length} NPCs`;
 
-  if (!listHtml) listHtml = '<div style="padding:14px;color:var(--muted);font-size:13px">No NPCs saved yet.<br>Use the in-game Save button to capture NPC trade data.</div>';
-
-  let detailHtml = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted)">Select an NPC from the list</div>';
-  if (activeNpcIdx !== null && NPCS[activeNpcIdx]) {
-    detailHtml = renderNpcDetail(NPCS[activeNpcIdx]);
+  const nav = document.getElementById('monsterList');
+  if (!filtered.length) {
+    nav.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:13px">No NPCs found.</div>';
+    return;
   }
-
-  document.getElementById('detail').innerHTML = `
-    <div class="npc-wrap">
-      <div class="npc-list-panel">${listHtml}</div>
-      <div class="npc-detail-panel" id="npcDetail">${detailHtml}</div>
-    </div>`;
-}
-
-function renderNpcList() {
-  renderNpcMode();
+  nav.innerHTML = filtered.map(n => {
+    const realIdx = NPCS.indexOf(n);
+    const buyCnt  = (n.you_buy||[]).length;
+    const sellCnt = (n.you_sell||[]).length;
+    return `<a data-npc-idx="${realIdx}" class="${realIdx===activeNpcIdx?'active':''}" onclick="showNpc(${realIdx})">
+      <div>${n.npc||'Unknown'}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">${n.location&&n.location!=='(unknown)'?n.location+' · ':''}buy ${buyCnt} · sell ${sellCnt}</div>
+    </a>`;
+  }).join('');
 }
 
 function showNpc(idx) {
   activeNpcIdx = idx;
-  const listPanel = document.querySelector('.npc-list-panel');
-  const savedListScroll = listPanel ? listPanel.scrollTop : 0;
-  renderNpcMode();
-  requestAnimationFrame(() => {
-    const p = document.getElementById('npcDetail');
-    if (p) p.scrollTop = 0;
-    const lp = document.querySelector('.npc-list-panel');
-    if (lp) lp.scrollTop = savedListScroll;
-  });
+  document.querySelectorAll('#monsterList a').forEach(a =>
+    a.classList.toggle('active', parseInt(a.dataset.npcIdx) === idx));
+  document.getElementById('detail').innerHTML = renderNpcDetail(NPCS[idx]);
 }
 
 function renderNpcDetail(npc) {
